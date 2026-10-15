@@ -15,11 +15,13 @@ import java.util.Locale
 import kotlin.properties.Delegates
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 
 class TimerFragment : Fragment() {
 
     private var _binding: FragmentTimerBinding? = null
     private val binding get() = _binding!!
+    private var timerJob: Job? = null
 
     private var time: Duration by Delegates.observable(Duration.ZERO) { _, _, newValue ->
         binding.time.text = newValue.toDisplayString()
@@ -66,6 +68,7 @@ class TimerFragment : Fragment() {
                 started = false
             }
         }
+        if (started) startTimer()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -75,14 +78,24 @@ class TimerFragment : Fragment() {
     }
 
     private fun startTimer() {
-        // TODO: Start timer
+        if (timerJob?.isActive == true) return
+        timerJob = viewLifecycleOwner.lifecycleScope.launch {
+            val initialTime = time
+            val mark = TimeSource.Monotonic.markNow()
+            while (isActive) {
+                delay(50)
+                time = initialTime + mark.elapsedNow()
+            }
+        }
     }
 
     private fun stopTimer() {
-        // TODO: Stop timer
+        timerJob?.cancel()
+        timerJob = null
     }
 
     override fun onDestroyView() {
+        stopTimer()
         super.onDestroyView()
         _binding = null
     }
@@ -94,9 +107,9 @@ class TimerFragment : Fragment() {
         private fun Duration.toDisplayString(): String = String.format(
             Locale.getDefault(),
             "%02d:%02d.%03d",
-            this.inWholeMinutes.toInt(),
-            this.inWholeSeconds.toInt(),
-            this.inWholeMilliseconds.toInt()
+            inWholeMinutes,
+            inWholeSeconds % 60,
+            inWholeMilliseconds % 1000
         )
     }
 }
