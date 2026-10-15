@@ -17,9 +17,9 @@ class LoginFragment : Fragment() {
     private var _binding: FragmentLoginBinding? = null
     private val binding get() = _binding!!
 
-    private lateinit var login: LoginBinding
-    private lateinit var content: ContentBinding
-    private lateinit var loading: LoadingBinding
+    private val login: LoginBinding get() = binding.loginScreen
+    private val content: ContentBinding get() = binding.contentScreen
+    private val loading: LoadingBinding get() = binding.loadingScreen
 
     private val loginViewModel by viewModels<LoginViewModel>()
 
@@ -29,10 +29,6 @@ class LoginFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         _binding = FragmentLoginBinding.inflate(inflater, container, false)
-
-        login = binding.loginScreen
-        content = binding.contentScreen
-        loading = binding.loadingScreen
 
         return binding.root
     }
@@ -55,10 +51,10 @@ class LoginFragment : Fragment() {
 
     private fun setupLogin() {
         login.loginButton.setOnClickListener {
-            val name = login.login.text?.trim() ?: ""
-            val password = login.password.text?.trim() ?: ""
+            val name = login.login.text?.toString()?.trim().orEmpty()
+            val password = login.password.text?.toString().orEmpty()
 
-            loginViewModel.login(name.toString(), password.toString())
+            loginViewModel.login(name, password)
         }
     }
 
@@ -93,6 +89,7 @@ class LoginFragment : Fragment() {
 
         content.contentGroup.isVisible = true
         content.name.text = data.user.name
+        loading.loadingGroup.isVisible = false
     }
 
     private fun showLoggingOut() {
