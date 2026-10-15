@@ -5,14 +5,16 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableStateFlow
 import ru.otus.coroutineshomework.databinding.FragmentTimerBinding
 import java.util.Locale
-import kotlin.properties.Delegates
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -23,18 +25,8 @@ class TimerFragment : Fragment() {
     private val binding get() = _binding!!
     private var timerJob: Job? = null
 
-    private var time: Duration by Delegates.observable(Duration.ZERO) { _, _, newValue ->
-        binding.time.text = newValue.toDisplayString()
-    }
-
-    private var started by Delegates.observable(false) { _, _, newValue ->
-        setButtonsState(newValue)
-        if (newValue) {
-            startTimer()
-        } else {
-            stopTimer()
-        }
-    }
+    private lateinit var timeFlow: MutableStateFlow<Duration>
+    private var started = false
 
     private fun setButtonsState(started: Boolean) {
         with(binding) {
@@ -54,18 +46,27 @@ class TimerFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        savedInstanceState?.let {
-            time = it.getLong(TIME).milliseconds
-            started = it.getBoolean(STARTED)
+        val initialTime = savedInstanceState?.getLong(TIME)?.milliseconds
+            ?: if (::timeFlow.isInitialized) timeFlow.value else Duration.ZERO
+        timeFlow = MutableStateFlow(initialTime)
+        started = savedInstanceState?.getBoolean(STARTED) ?: started
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                timeFlow.collect { binding.time.text = it.toDisplayString() }
+            }
         }
         setButtonsState(started)
         with(binding) {
-            time.text = this@TimerFragment.time.toDisplayString()
+            time.text = initialTime.toDisplayString()
             btnStart.setOnClickListener {
                 started = true
+                setButtonsState(started)
+                startTimer()
             }
             btnStop.setOnClickListener {
                 started = false
+                stopTimer()
+                setButtonsState(started)
             }
         }
         if (started) startTimer()
@@ -73,18 +74,20 @@ class TimerFragment : Fragment() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        outState.putLong(TIME, time.inWholeMilliseconds)
+        if (::timeFlow.isInitialized) {
+            outState.putLong(TIME, timeFlow.value.inWholeMilliseconds)
+        }
         outState.putBoolean(STARTED, started)
     }
 
     private fun startTimer() {
         if (timerJob?.isActive == true) return
         timerJob = viewLifecycleOwner.lifecycleScope.launch {
-            val initialTime = time
+            val initialTime = timeFlow.value
             val mark = TimeSource.Monotonic.markNow()
             while (isActive) {
                 delay(50)
-                time = initialTime + mark.elapsedNow()
+                timeFlow.emit(initialTime + mark.elapsedNow())
             }
         }
     }
