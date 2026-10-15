@@ -30,19 +30,20 @@ class NetworkFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         networkViewModel.running.observe(viewLifecycleOwner) { running ->
-            binding.loading.isVisible = true == running
-            binding.numOfThreadsLayout.isEnabled = true != running
-            binding.btnStart.isEnabled = true != running
+            binding.loading.isVisible = running
+            binding.result.isVisible = !running
+            binding.numOfThreadsLayout.isEnabled = !running
+            binding.btnStart.isEnabled = !running
         }
 
         networkViewModel.result.observe(viewLifecycleOwner) { result ->
-            binding.result.text = result?.let { getString(R.string.result, it.toFloat() / 1000) } ?: ""
+            binding.result.text = result?.let { getString(R.string.result, it.toFloat() / 1000) }
+                ?: getString(R.string.no_successful_requests)
         }
 
-        binding.numOfThreads.setText(
-            resources.getStringArray(R.array.num_of_threads)[0],
-            false
-        )
+        if (savedInstanceState == null) {
+            binding.numOfThreads.setText(resources.getStringArray(R.array.num_of_threads)[0], false)
+        }
 
         binding.btnStart.setOnClickListener {
             networkViewModel.startTest(binding.numOfThreads.text.toString().toIntOrNull() ?: 1)
